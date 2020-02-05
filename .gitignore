@@ -1,0 +1,13 @@
+# Logs
+*.log
+
+#Folders
+capture/*
+diccionario/*
+web/img/*
+web/infohack/*
+
+#web
+/web/index.htm
+/web/error.html
+index.htm.ok

